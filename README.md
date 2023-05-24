@@ -11,3 +11,15 @@ grep '|MSH|' MRCONSO.RRF | awk -F '|' '$7=="Y"{print $1 "|" $7 "|" $14 "|" $15}'
 ```
 
 On UMLS' 2023 MRCONSO.RRF release
+
+
+Other possible sources of UMLS to Wikidata matching: 
+
+* https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/ICD10CM/index.html
+* https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/GO/index.html
+* https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/HGNC/index.html
+* https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/ORPHANET/index.html
+* https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/FMA/index.html
+
+
+Other sources on UMLS are listed on nlm.nih.gov/research/umls/sourcereleasedocs/index.html
