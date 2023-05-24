@@ -4,6 +4,7 @@ from wikidataintegrator import wdi_core, wdi_login
 import json
 from login import USER, PASSWORD
 import time
+from tqdm import tqdm
 
 # Setup logging
 logging.basicConfig(
@@ -38,7 +39,7 @@ with open("cui_wikidata.json", "r") as f:
 login = wdi_login.WDLogin(USER, PASSWORD)
 
 # Iterate over the data
-for umls, wikidata_id in data.items():
+for umls, wikidata_id in tqdm(data.items()):
     # Skip if UMLS ID already exists
     if umls in existing_umls_ids:
         continue
@@ -49,8 +50,12 @@ for umls, wikidata_id in data.items():
         new_item=False,
     )
     wd_item.get_wd_json_representation()
+
+    references = [
+        [wdi_core.WDItemID(value="Q105870539", prop_nr="P248", is_reference=True)]
+    ]
     # Create a new string statement
-    statement = wdi_core.WDString(value=umls, prop_nr="P2892")
+    statement = wdi_core.WDString(value=umls, prop_nr="P2892", references=references)
 
     # Set the statement
     wd_item.update([statement])
