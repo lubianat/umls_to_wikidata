@@ -5,6 +5,7 @@ import json
 from login import USER, PASSWORD
 import time
 from tqdm import tqdm
+from datetime import datetime
 
 # Setup logging
 logging.basicConfig(
@@ -13,6 +14,11 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%m/%d/%Y %I:%M:%S %p",
 )
+
+# Load the JSON file
+with open("cui_wikidata_from_mesh.json", "r") as f:
+    data = json.load(f)
+
 
 # Fetch all UMLS IDs from Wikidata
 sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
@@ -31,9 +37,6 @@ existing_umls_ids = {
     result["umls"]["value"] for result in results["results"]["bindings"]
 }
 
-# Load the JSON file
-with open("cui_wikidata.json", "r") as f:
-    data = json.load(f)
 
 # Log in to Wikidata using credentials from login.py
 login = wdi_login.WDLogin(USER, PASSWORD)
@@ -51,8 +54,16 @@ for umls, wikidata_id in tqdm(data.items()):
     )
     wd_item.get_wd_json_representation()
 
+    date = datetime.now()
+    timeStringNow = date.strftime("+%Y-%m-%dT00:00:00Z")
+    refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr="P813", is_reference=True)
+
     references = [
-        [wdi_core.WDItemID(value="Q105870539", prop_nr="P248", is_reference=True)]
+        [
+            wdi_core.WDItemID(value="Q118645058", prop_nr="P887", is_reference=True),
+            wdi_core.WDItemID(value="Q118645236", prop_nr="P248", is_reference=True),
+            refRetrieved,
+        ]
     ]
     # Create a new string statement
     statement = wdi_core.WDString(value=umls, prop_nr="P2892", references=references)
