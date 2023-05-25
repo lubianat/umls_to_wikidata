@@ -6,6 +6,10 @@ from login import USER, PASSWORD
 import time
 from tqdm import tqdm
 from datetime import datetime
+from pathlib import Path
+
+HERE = Path(__file__).parent.resolve()
+RESULTS = HERE.parent.joinpath("results").resolve()
 
 # Setup logging
 logging.basicConfig(
@@ -16,9 +20,7 @@ logging.basicConfig(
 )
 
 # Load the JSON file
-with open("cui_wikidata_from_mesh.json", "r") as f:
-    data = json.load(f)
-
+data = json.loads(RESULTS.joinpath("cui_wikidata_from_mesh_unique.json").read_text())
 
 # Fetch all UMLS IDs from Wikidata
 sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
@@ -73,7 +75,11 @@ for umls, wikidata_id in tqdm(data.items()):
     time.sleep(0.5)
     # Write the item
     try:
-        wd_item.write(login, bot_account=False)
+        wd_item.write(
+            login,
+            bot_account=False,
+            edit_summary="Updated UMLS CUI with heuristic based on UMLS 2023AA release.",
+        )
     except Exception as e:
         # Log the error
         logging.error(f"QID: {wikidata_id}, UMLS CUI: {umls}, Error: {str(e)}")
