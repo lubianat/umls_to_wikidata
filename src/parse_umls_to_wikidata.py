@@ -1,62 +1,107 @@
+import logging
 from SPARQLWrapper import SPARQLWrapper, JSON
-from collections import defaultdict
+from wikidataintegrator import wdi_core, wdi_login
+import json
+from login import USER, PASSWORD
+import time
+from tqdm import tqdm
+from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent.resolve()
-DATA = HERE.parent.joinpath("UMLS_data").resolve()
 RESULTS = HERE.parent.joinpath("results").resolve()
-# Create a SPARQLWrapper instance
-sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
 
-# Write your query
+# Setup logging
+logging.basicConfig(
+    filename="error_log.log",
+    level=logging.ERROR,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%m/%d/%Y %I:%M:%S %p",
+)
+
+# Define your sources and their associated WDItemID
+sources = {
+    # "ICD10CM": "Q119459345", mappings are seemly of not-so-great quality
+    "FMA": "Q119459341",
+    "GO": "Q119459342",
+    "HGNC": "Q119459343",
+    "ORPHANET": "Q119459347",
+    "NCBI": "Q119459346",
+    "MSH": "Q118645058",
+}
+
+# Fetch all UMLS IDs from Wikidata
+sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
 sparql.setQuery(
     """
-    SELECT ?item  ?mesh_id
-    WHERE 
-    {
-      ?item wdt:P486 ?mesh_id.
+    SELECT ?umls WHERE {
+        ?item wdt:P2892 ?umls.
     }
 """
 )
-
-# Set the return format to JSON
 sparql.setReturnFormat(JSON)
-
-# Execute the query and convert the result to a Python dictionary
 results = sparql.query().convert()
 
-# Create a MeSH to QID dictionary
-mesh_to_qid = {
-    result["mesh_id"]["value"]: result["item"]["value"].split("/")[-1]
-    for result in results["results"]["bindings"]
+# Create a set of existing UMLS IDs
+existing_umls_ids = {
+    result["umls"]["value"] for result in results["results"]["bindings"]
 }
 
-# Create a dictionary to store CUI:MeSH mappings
-mesh_to_cui = defaultdict(list)
+# Log in to Wikidata using credentials from login.py
+login = wdi_login.WDLogin(USER, PASSWORD)
 
-# Open the output file and map each line to MeSH terms
-with open(DATA.joinpath("mesh.txt"), "r") as f:
-    for line in f:
-        parts = line.strip().split("|")
-        cui = parts[0]
-        mesh = parts[1]
-        mesh_to_cui[mesh].append(cui)
+# Iterate over each source
+for name, wditem in sources.items():
+    # Load the JSON file
+    data = json.loads(
+        RESULTS.joinpath(f"cui_wikidata_from_{name}_unique.json").read_text()
+    )
 
-# Create a dictionary to store CUI to QID mappings, excluding CUIs with more than one MeSH term
-cui_to_qid = {}
-for mesh, cui_list in mesh_to_cui.items():
-    if (
-        len(cui_list) == 1
-    ):  # only add to dictionary if there is a single CUI for the MeSH
-        cui = cui_list[0]
-        qid = mesh_to_qid.get(mesh)
-        if qid:
-            cui_to_qid[cui] = qid
+    # Iterate over the data
+    for umls, wikidata_id in tqdm(data.items()):
+        # Skip if UMLS ID already exists
+        if umls in existing_umls_ids:
+            continue
 
-import json
-from pathlib import Path
+        # Create a new data object
+        wd_item = wdi_core.WDItemEngine(
+            wd_item_id=wikidata_id,
+            new_item=False,
+        )
+        wd_item.get_wd_json_representation()
 
-# Save CUI to QID mappings as a JSON file
-RESULTS.joinpath("cui_wikidata_from_mesh_unique.json").write_text(
-    json.dumps(cui_to_qid, indent=4, sort_keys=True)
-)
+        date = datetime.now()
+        timeStringNow = date.strftime("+%Y-%m-%dT00:00:00Z")
+        refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr="P813", is_reference=True)
+
+        references = [
+            [
+                wdi_core.WDItemID(value=wditem, prop_nr="P887", is_reference=True),
+                wdi_core.WDItemID(
+                    value="Q118645236", prop_nr="P248", is_reference=True
+                ),
+                refRetrieved,
+            ]
+        ]
+        # Create a new string statement
+        statement = wdi_core.WDString(
+            value=umls, prop_nr="P2892", references=references
+        )
+
+        # Set the statement
+        wd_item.update([statement])
+        time.sleep(0.5)
+        # Write the item
+        try:
+            wd_item.write(
+                login,
+                bot_account=False,
+                edit_summary="Updated UMLS CUI with heuristic based on UMLS 2023AA release.",
+            )
+            break
+        except Exception as e:
+            # Log the error
+            logging.error(
+                f"Source: {name}, QID: {wikidata_id}, UMLS CUI: {umls}, Error: {str(e)}"
+            )
+            continue

@@ -16,6 +16,7 @@ grep '|MSH|' MRCONSO.RRF | awk -F '|' '$7=="Y"{print $1 "|" $14 }' | sort -u > m
 On UMLS' 2023 MRCONSO.RRF release
 
 
+
 Other possible sources of UMLS to Wikidata matching: 
 
 * https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/ICD10CM/index.html
