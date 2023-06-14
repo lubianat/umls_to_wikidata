@@ -98,7 +98,6 @@ for name, wditem in sources.items():
                 bot_account=False,
                 edit_summary="Updated UMLS CUI with heuristic based on UMLS 2023AA release.",
             )
-            break
         except Exception as e:
             # Log the error
             logging.error(
